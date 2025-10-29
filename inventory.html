@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📱 Mobile Barcode Scanner</title>
+  <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background-color: #f4f4f4;
+      height: 100vh;
+      text-align: center;
+    }
+
+    h2 {
+      margin-top: 20px;
+    }
+
+    #video {
+      width: 90%;
+      max-width: 400px;
+      border: 3px solid #333;
+      border-radius: 12px;
+      margin-top: 15px;
+      background-color: #000;
+      overflow: hidden;
+    }
+
+    #result, #product {
+      margin-top: 15px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    img {
+      max-width: 150px;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h2>📦 Mobile Barcode Scanner</h2>
+  <div id="video"></div>
+  <div id="result">Click "Start Scanner" to begin</div>
+  <div id="product"></div>
+  <button id="startBtn">Start Scanner</button>
+
+  <script>
+    const startBtn = document.getElementById("startBtn");
+
+    startBtn.addEventListener("click", () => {
+      startBtn.disabled = true;
+      startBtn.textContent = "Starting...";
+      startScanner();
+    });
+
+    function startScanner() {
+      Quagga.init({
+        inputStream: {
+          type: "LiveStream",
+          target: document.querySelector("#video"),
+          constraints: {
+            facingMode: { exact: "environment" }, // use back camera if available
+          },
+        },
+        decoder: {
+          readers: ["ean_reader", "upc_reader", "code_128_reader"],
+        },
+      }, function (err) {
+        if (err) {
+          console.error(err);
+          alert("❌ Camera access failed. Please allow camera permission in your browser settings.");
+          startBtn.disabled = false;
+          startBtn.textContent = "Start Scanner";
+          return;
+        }
+        Quagga.start();
+        startBtn.style.display = "none";
+        document.getElementById("result").innerText = "Scanning...";
+      });
+
+      Quagga.onDetected(async function (data) {
+        const code = data.codeResult.code;
+        document.getElementById("result").innerText = `Barcode: ${code}`;
+
+        // Fetch product info
+        const url = `https://world.openfoodfacts.org/api/v2/product/${code}.json`;
+        try {
+          const response = await fetch(url);
+          const result = await response.json();
+
+          if (result.product) {
+            const name = result.product.product_name || "Unknown product";
+            const brand = result.product.brands || "Unknown brand";
+            const image = result.product.image_url || "";
+
+            document.getElementById("product").innerHTML = `
+              <h3>${name}</h3>
+              <p><strong>Brand:</strong> ${brand}</p>
+              ${image ? `<img src="${image}" alt="${name}">` : ""}
+            `;
+          } else {
+            document.getElementById("product").innerHTML = "❌ Product not found.";
+          }
+        } catch (error) {
+          console.error(error);
+          document.getElementById("product").innerHTML = "⚠️ Error fetching product info.";
+        }
+      });
+    }
+  </script>
+</body>
+</html>
